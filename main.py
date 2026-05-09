@@ -126,6 +126,57 @@ class MenuModel(Model):
         self._objects: dict[int, list[Entity]] = {}
         self._make_objects()
 
+    def _make_objects(self) -> None:
+
+        self._gfx_objects.append(OBJECT_TYPE_TITLE_SCREEN)
+        background = Entity(
+            x = 878, y = SCREEN_HEIGHT - 25,
+            width = 1755, height = 1080,
+            object_type = OBJECT_TYPE_TITLE_SCREEN)
+        self._objects[OBJECT_TYPE_TITLE_SCREEN] = [background]
+
+        #TODO: Title
+
+        #TODO: New Game Button
+
+        #TODO: Quit Button
+    
+    def get_gfx_objects(self) -> dict[int, list[Entity]]:
+        return self._gfx_objects
+    
+    def get_objects(self) -> dict[int, list[Entity]]:
+        return self._objects
+
+class MenuView(View):
+
+    def __init__(self, screen: Surface):
+        super().__init__(screen)
+    
+    def load_gfx_objects(self, gfx_objects: list[int]) -> None:
+        
+        for object_type in gfx_objects:
+            self.load_gfx(object_type)
+        
+    def draw(self, objects: dict[int, list[Entity]]) -> None:
+
+        self._draw_entity_image(objects[OBJECT_TYPE_TITLE_SCREEN][0])
+
+        self._finish_drawing()
+
+class MenuController(Controller):
+    def __init__(self, clock: Clock, screen: Surface):
+        super().__init__(clock)
+        self._model = MenuModel()
+        self._view = MenuView(screen)
+        self._view.load_gfx_objects(self._model.get_gfx_objects())
+    
+    def _draw(self) -> None:
+        self._view.draw(self._model.get_objects())
+    
+    def _update_world(self) -> int:
+        
+        return GAME_PHASE_NO_CHANGE
+
 #endregion
 def main():
     next_phase = GAME_PHASE_LOGO
@@ -133,7 +184,7 @@ def main():
         if next_phase == GAME_PHASE_LOGO:
             controller = LogoController(clock, screen)
         elif next_phase == GAME_PHASE_MENU:
-            break
+            controller = MenuController(clock, screen)
         next_phase = controller.run()
 
 main()

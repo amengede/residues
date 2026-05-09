@@ -255,7 +255,7 @@ IMAGE_DESCRIPTORS = {
 	},
 	OBJECT_TYPE_TITLE_SCREEN: {
 		"filename": "img/title_screen.png",
-		"scale": 1.0,
+		"scale": 0.55,
 	},
 }
 #endregion
