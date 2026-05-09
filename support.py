@@ -87,6 +87,19 @@ class Observable:
 
         self._event_queue.clear()
 #endregion
+#region Timers
+class Timer:
+    """Counts down a number of frames."""
+
+    def __init__(self, duration: int):
+        self._duration = duration
+    
+    def update(self) -> None:
+        self._duration = max(0, self._duration - 1)
+    
+    def is_ellapsed(self) -> bool:
+        return self._duration == 0
+#endregion
 #region Audio
 SFX = pg.mixer.Sound
 class AudioPlayer(Observable):
@@ -372,6 +385,9 @@ class AnimatedEntity(Entity, Observable):
         spritesheet = self._spritesheets[animation_type]
         self._frame_count = spritesheet["image_count"]
         self._mirror = False
+    
+    def set_frame(self, frame_number: int):
+        self._frame_number = frame_number % self._frame_count
     
     def get_state(self) -> int:
         """
