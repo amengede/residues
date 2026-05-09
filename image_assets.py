@@ -127,7 +127,7 @@ IMAGE_DESCRIPTORS = {
 	},
 	OBJECT_TYPE_BLANK_PAGE: {
 		"filename": "img/blank_page.png",
-		"scale": 16.0,
+		"scale": 8.0,
 	},
 	OBJECT_TYPE_CONSOLE: {
 		"filename": "img/console.png",
@@ -239,7 +239,7 @@ IMAGE_DESCRIPTORS = {
 	},
 	OBJECT_TYPE_OVERWORLD_TREE: {
 		"filename": "img/overworld_tree.png",
-		"scale": 25,
+		"scale": 0.25,
 	},
     OBJECT_TYPE_PC_OVERWORLD_DOWN: {
 		"filename": "img/pc_overworld_down.png",

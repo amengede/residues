@@ -119,7 +119,9 @@ class AudioPlayer(Observable):
         self._sfx: dict[int, dict[int, list[SFX]]] = {}
         self._tracks: dict[str, SFX] = {}
         
-    def load_sfx(self, object_type: int, event_type: int, filename: str) -> None:
+    def load_sfx(self, object_type: int,
+                 event_type: int,
+                 filename: str, gain: float = 1.0) -> None:
         """
             Load a sound effect. Sound effects are associated with a specific
             object and event.
@@ -134,9 +136,21 @@ class AudioPlayer(Observable):
             self._sfx[object_type] = {}
         sound_board = self._sfx[object_type]
         sound = pg.mixer.Sound(filename)
+        sound.set_volume(gain)
         if event_type not in sound_board:
             sound_board[event_type] = []
         sound_board[event_type].append(sound)
+    
+    def clear_all(self) -> None:
+        """
+            Unload all sfx and music
+        """
+
+        for soundboard in self._sfx.values():
+            for sounds in soundboard.values():
+                for sound in sounds:
+                    sound.stop()
+                sounds.clear()
 
     def unload_sfx(self, object_type: int, event_type: int) -> None:
         """
@@ -187,6 +201,8 @@ class AudioPlayer(Observable):
                 continue
             sound_board = self._sfx[event.object_type]
             if event.event_type not in sound_board:
+                continue
+            if len(sound_board[event.event_type]) == 0:
                 continue
             sound = random.choice(sound_board[event.event_type])
             sound.play()
