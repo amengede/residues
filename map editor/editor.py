@@ -47,7 +47,7 @@ class Editor(QMainWindow):
             Reset any editor state, independent of model state.
         """
 
-        self.current_brush = OBJECT_TYPE_BLOCK
+        self.current_brush = OBJECT_TYPE_OVERWORLD_TREE
         self._object_descriptors = \
             model.load_object_descriptors(
                 "../levels/object_descriptions.txt")
@@ -223,7 +223,7 @@ class Editor(QMainWindow):
         descriptor = self._object_descriptors[self.current_brush]
         self.selected_object = model.GameObject(
             x, y, self.current_brush, descriptor,
-            self.objects[OBJECT_TYPE_BLOCK])
+            [])
         self.selected_object.selected = True
         self.objects[self.current_brush].append(self.selected_object)
     

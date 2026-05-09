@@ -121,7 +121,7 @@ def load_object_descriptors(filename: str) -> dict[int, ObjectDescriptor]:
             line = line.replace("\n", "")
             words = line.split(" ")
 
-            if len(words) < 4:
+            if len(words) < 3:
                 continue
 
             name = words[0]
@@ -132,8 +132,6 @@ def load_object_descriptors(filename: str) -> dict[int, ObjectDescriptor]:
             scale = float(words[1])
             filepath = words[2]
             sits_on_ground = False
-            if words[3] == "True":
-                sits_on_ground = True
 
             descriptors[code] = ObjectDescriptor(
                 name, scale, filepath, sits_on_ground)

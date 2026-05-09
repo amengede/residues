@@ -1,0 +1,7 @@
+npc 0.25 ../img/npc_overworld_down.png
+building 0.5 ../img/overworld_building.png
+grass 0.125 ../img/overworld_grass.png
+path 0.25 ../img/overworld_path.png
+puzzle 0.25 ../img/overworld_puzzle.png
+tree 0.25 ../img/overworld_tree.png
+pc 0.25 ../img/pc_overworld_down.png
