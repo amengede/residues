@@ -987,6 +987,27 @@ class View:
         dst_rect[1] -= cam_y
         self._screen.blit(image, dst_rect)
     
+    def _draw_entity_image_overloaded(
+            self, entity: Entity, object_type: int,
+            cam_x: int = 0, cam_y: int = 0) -> None:
+        """
+            Draw an entity with an image.
+
+            Paramateters:
+                entity: Entity to draw
+                cam_x: x coordinate to subtract from entity's position (default is no change)
+                cam_y: y coordinate to subtract from entity's position (default is no change)
+        """
+
+        if object_type not in self._images:
+            return
+        
+        image = self._images[object_type]
+        dst_rect = entity.get_draw_rect_data()
+        dst_rect[0] -= cam_x
+        dst_rect[1] -= cam_y
+        self._screen.blit(image, dst_rect)
+    
     def _draw_animated_entity(
             self, entity: AnimatedEntity,
             cam_x: int = 0, cam_y: int = 0) -> None:

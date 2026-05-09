@@ -171,7 +171,7 @@ IMAGE_DESCRIPTORS = {
 	},
 	OBJECT_TYPE_LABEL_QUIT: {
 		"filename": "img/label_quit.png",
-		"scale": 1.0,
+		"scale": 100/432,
 	},
 	OBJECT_TYPE_LABEL_RESIDUES: {
 		"filename": "img/label_residues.png",
@@ -179,7 +179,7 @@ IMAGE_DESCRIPTORS = {
 	},
 	OBJECT_TYPE_LABEL_START: {
 		"filename": "img/label_start.png",
-		"scale": 1.0,
+		"scale": 100/464,
 	},
     OBJECT_TYPE_LIGHTNING_BOLT: {
 		"filename": "img/lightning_bolt.png",

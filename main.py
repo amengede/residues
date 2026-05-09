@@ -17,6 +17,7 @@ EVENT_TYPE_MACHINE_RESET = 17
 
 GAME_PHASE_LOGO = 0
 GAME_PHASE_MENU = 1
+GAME_PHASE_OVERWORLD = 2
 #endregion
 #region setup
 pg.init()
@@ -142,15 +143,59 @@ class MenuModel(Model):
             object_type = OBJECT_TYPE_LABEL_RESIDUES)
         self._objects[OBJECT_TYPE_LABEL_RESIDUES] = [title]
 
-        #TODO: New Game Button
+        self._gfx_objects.append(OBJECT_TYPE_LABEL_START)
+        new_button = Button(
+            x = 350, y = 450,
+            width = 100, height = 50,
+            text = "New Game")
+        new_button.add_observer(self._event_queue)
+        new_button.add_observer(audio_system.get_events())
+        self.add_observer(new_button.get_events())
+        self._objects[OBJECT_TYPE_LABEL_START] = [new_button]
 
-        #TODO: Quit Button
+        self._gfx_objects.append(OBJECT_TYPE_LABEL_QUIT)
+        quit_button = Button(
+            x = 500, y = 450,
+            width = 100, height = 50,
+            text = "Quit")
+        quit_button.add_observer(self._event_queue)
+        quit_button.add_observer(audio_system.get_events())
+        self.add_observer(quit_button.get_events())
+        self._objects[OBJECT_TYPE_LABEL_QUIT] = [quit_button]
     
     def get_gfx_objects(self) -> dict[int, list[Entity]]:
         return self._gfx_objects
     
     def get_objects(self) -> dict[int, list[Entity]]:
         return self._objects
+
+    def update(self, mouse_x: int, mouse_y: int) -> int:
+
+        button: Button = self._objects[OBJECT_TYPE_LABEL_START][0]
+        button.update(mouse_x, mouse_y)
+
+        button = self._objects[OBJECT_TYPE_LABEL_QUIT][0]
+        button.update(mouse_x, mouse_y)
+
+        for event in self.get_events():
+            if event.event_type == EVENT_TYPE_MOUSE_CLICK:
+                button: Button = event.instance
+                if not button.is_active():
+                    continue
+                if button._text == "New Game":
+                    audio_system.stop_music()
+                    return GAME_PHASE_OVERWORLD
+                if button._text == "Quit":
+                    audio_system.stop_music()
+                    return GAME_PHASE_EXIT
+        self.clear_events()
+
+        return GAME_PHASE_NO_CHANGE
+    
+    def handle_click(self) -> None:
+        self.publish(Message(event_type=EVENT_TYPE_MOUSE_CLICK,
+                             object_type=OBJECT_TYPE_MODEL,
+                             instance = self))
 
 class MenuView(View):
 
@@ -161,13 +206,26 @@ class MenuView(View):
         
         for object_type in gfx_objects:
             self.load_gfx(object_type)
+    
+    def draw_button(self, button: Button, object_type: int) -> None:
+
+        if button.is_active():
+            shifted_rect = button.get_draw_rect_data()
+            shifted_rect[0] -= 10
+            shifted_rect[1] -= 10
+            pg.draw.rect(self._screen, (0,0,0), shifted_rect)
+            self._draw_entity_coloured(button, -10, -10)
         
+        self._draw_entity_image_overloaded(button, object_type)
+   
     def draw(self, objects: dict[int, list[Entity]]) -> None:
 
         self._draw_entity_image(objects[OBJECT_TYPE_TITLE_SCREEN][0])
-
         self._draw_entity_image(objects[OBJECT_TYPE_LABEL_RESIDUES][0])
-
+        self.draw_button(objects[OBJECT_TYPE_LABEL_START][0],
+                         OBJECT_TYPE_LABEL_START)
+        self.draw_button(objects[OBJECT_TYPE_LABEL_QUIT][0],
+                         OBJECT_TYPE_LABEL_QUIT)
         self._finish_drawing()
 
 class MenuController(Controller):
@@ -176,13 +234,37 @@ class MenuController(Controller):
         self._model = MenuModel()
         self._view = MenuView(screen)
         self._view.load_gfx_objects(self._model.get_gfx_objects())
+        self._load_sfx()
+    
+    def _load_sfx(self) -> None:
+        audio_system.load_sfx(
+            object_type = OBJECT_TYPE_BUTTON,
+            event_type = EVENT_TYPE_MOUSE_ENTER,
+            filename = "sfx/click_1.wav")
+        
+        audio_system.load_sfx(
+            object_type = OBJECT_TYPE_BUTTON,
+            event_type = EVENT_TYPE_MOUSE_LEAVE,
+            filename = "sfx/click_2.wav")
+        
+        audio_system.load_sfx(
+            object_type = OBJECT_TYPE_BUTTON,
+            event_type = EVENT_TYPE_MOUSE_CLICK,
+            filename = "sfx/click_3.wav")
     
     def _draw(self) -> None:
         self._view.draw(self._model.get_objects())
     
     def _update_world(self) -> int:
+
+        audio_system.update()
         
-        return GAME_PHASE_NO_CHANGE
+        return self._model.update(
+            mouse_x = self._mouse_pos[0],
+            mouse_y = self._mouse_pos[1])
+    
+    def _mouse_clicked(self):
+        self._model.handle_click()
 
 #endregion
 def main():
