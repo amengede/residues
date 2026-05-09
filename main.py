@@ -16,11 +16,13 @@ EVENT_TYPE_LIGHTNING_SPELL = 14
 EVENT_TYPE_STEP_PATH = 15
 EVENT_TYPE_STEP_DIRT = 16
 EVENT_TYPE_MACHINE_RESET = 17
+EVENT_TYPE_DIALOGUE_TICK = 18
 
 GAME_PHASE_LOGO = 0
 GAME_PHASE_MENU = 1
 GAME_PHASE_OVERWORLD = 2
 GAME_PHASE_BATTLE = 3
+GAME_PHASE_CONSOLE = 4
 #endregion
 #region setup
 pg.init()
@@ -445,6 +447,8 @@ class Player(Entity, Observable):
         self.step()
 
 class NPC(Entity):
+    LABELS = ["npc_a", "npc_b"]
+    NPC_COUNT = 0
 
     def __init__(self, x: int, y: int):
         w = 0.25 * 192
@@ -458,6 +462,16 @@ class NPC(Entity):
 
         self.choose_direction()
         self._speed = 4
+        self._label = NPC.LABELS[NPC.NPC_COUNT % len(NPC.LABELS)]
+        NPC.NPC_COUNT += 1
+    
+    def get_label(self) -> str:
+        return self._label
+    
+    def speak(self) -> str:
+        with open(f"dialogue/{self._label}.txt", "r") as file:
+            lines = file.readlines()
+            return random.choice(lines)
     
     def choose_direction(self) -> None:
 
@@ -663,6 +677,18 @@ class OverworldModel(Model):
             self.load("levels/level_1.txt")
         else:
             self.load("levels/temp.txt")
+        
+        self._dialogue_line = ""
+        self._dialogue_buffer = ""
+        self._speaking_npc = None
+        self._timer = None
+        self.add_observer(audio_system.get_events())
+    
+    def get_dialogue_buffer(self) -> str:
+        return self._dialogue_buffer
+
+    def get_speaking_npc(self) -> str:
+        return self._speaking_npc
     
     def load(self, filename: str) -> None:
         self._gfx_objects.clear()
@@ -675,6 +701,9 @@ class OverworldModel(Model):
             OBJECT_TYPE_OVERWORLD_TREE: EntityGroup(),
         }
         self._player = None
+
+        self._declare_gfx(OBJECT_TYPE_NPC_A_PORTRAIT)
+        self._declare_gfx(OBJECT_TYPE_NPC_B_PORTRAIT)
         
         with open(filename, "r") as file:
             while line := file.readline():
@@ -908,6 +937,27 @@ class OverworldModel(Model):
             npc.update(self._object_groups)
         npcs.rebuild()
 
+        if len(self._dialogue_buffer) < len(self._dialogue_line):
+            if self._timer is None:
+                self._timer = Timer(4)
+            elif self._timer.is_ellapsed():
+                cursor = len(self._dialogue_buffer)
+                self._dialogue_buffer += self._dialogue_line[cursor]
+                self.publish(Message(EVENT_TYPE_DIALOGUE_TICK,
+                                     OBJECT_TYPE_MODEL, self))
+                self._timer = None
+        elif len(self._dialogue_buffer) != 0:
+            if self._timer is None:
+                self._timer = Timer(180)
+            elif self._timer.is_ellapsed():
+                self._dialogue_buffer = ""
+                self._dialogue_line = ""
+                self._speaking_npc = None
+                self._timer = None
+        
+        if self._timer is not None:
+            self._timer.update()
+
         return GAME_PHASE_NO_CHANGE
         
     def handle_keys(self, keys: dict[int, bool]) -> None:
@@ -924,8 +974,31 @@ class OverworldModel(Model):
     def key_pressed(self, key: int) -> None:
 
         if key == pg.K_SPACE:
-            #TODO: interact with things!
-            pass
+            dx = 0
+            dy = 0
+            object_type = self._player.get_object_type()
+            if object_type == OBJECT_TYPE_PC_OVERWORLD_DOWN:
+                dy = 32
+            elif object_type == OBJECT_TYPE_PC_OVERWORLD_UP:
+                dy = -32
+            elif self._player.x_scale > 0:
+                dx = 32
+            else:
+                dx = -32
+            
+            shifted_rect = Rectangle(self._player.get_x() + dx,
+                                     self._player.get_y() + dy,
+                                     2 * self._player.get_half_width(),
+                                     2 * self._player.get_half_height())
+
+            overlapping = self._object_groups[
+                OBJECT_TYPE_NPC_OVERWORLD_DOWN].get_overlapping(shifted_rect)
+            
+            if len(overlapping) > 0:
+                self._dialogue_buffer = ""
+                npc: NPC = overlapping[0]
+                self._dialogue_line = npc.speak()
+                self._speaking_npc = npc
 
 class OverworldView(View):
 
@@ -939,7 +1012,9 @@ class OverworldView(View):
     def draw(self, covered_object_groups: dict[int, EntityGroup],
              covering_object_groups: dict[int, EntityGroup],
              camera: Camera, background: Entity,
-             player: Player) -> None:
+             player: Player,
+             speaking_npc: NPC,
+             dialogue_buffer: str) -> None:
         
         cam_x = camera.get_x() - SCREEN_WIDTH / 2
         cam_y = camera.get_y() - SCREEN_HEIGHT / 2
@@ -971,6 +1046,23 @@ class OverworldView(View):
         for entity in visible_set:
             self._draw_entity_image(entity, cam_x, cam_y)
         
+        if speaking_npc is not None:
+            rect = [200, 430, 700, 150]
+            pg.draw.rect(self._screen, (196, 196, 196), rect)
+            pg.draw.rect(self._screen, (0, 0, 0), rect, 4)
+
+            self._draw_text(dialogue_buffer, 300, 450, (0,0,0))
+            
+            object_type = (OBJECT_TYPE_NPC_A_PORTRAIT 
+                           if speaking_npc.get_label() == "npc_a" 
+                           else OBJECT_TYPE_NPC_B_PORTRAIT)
+            if object_type not in self._images:
+                return
+        
+            image = self._images[object_type]
+            dst_rect = (150, 400)
+            self._screen.blit(image, dst_rect)
+        
         self._finish_drawing()
 
 class OverworldController(Controller):
@@ -996,6 +1088,19 @@ class OverworldController(Controller):
         audio_system.load_sfx(
             OBJECT_TYPE_PC_OVERWORLD_DOWN, 
             EVENT_TYPE_STEP_PATH, "sfx/step_4.wav", 4.0)
+        
+        audio_system.load_sfx(
+            OBJECT_TYPE_MODEL,
+            EVENT_TYPE_DIALOGUE_TICK,
+            "sfx/click_1.wav")
+        audio_system.load_sfx(
+            OBJECT_TYPE_MODEL,
+            EVENT_TYPE_DIALOGUE_TICK,
+            "sfx/click_2.wav")
+        audio_system.load_sfx(
+            OBJECT_TYPE_MODEL,
+            EVENT_TYPE_DIALOGUE_TICK,
+            "sfx/click_3.wav")
     
     def _draw(self) -> None:
         self._view.draw(
@@ -1003,7 +1108,9 @@ class OverworldController(Controller):
             self._model.get_covering_object_groups(), 
             self._model.get_camera(), 
             self._model.get_background(), 
-            self._model.get_player())
+            self._model.get_player(),
+            self._model.get_speaking_npc(),
+            self._model.get_dialogue_buffer())
     
     def _update_world(self) -> int:
         audio_system.update()
@@ -1262,7 +1369,7 @@ class Mage(Actor):
     def __init__(self, health: int, max_health: int, damage: int, i: int):
         super().__init__("Mage", health, max_health,
                          damage, OBJECT_TYPE_MAGE_IDLE, 100, 150 * i)
-        self._friendly = True
+        self._friendly = False
     
     def get_moves(self) -> list[str]:
         return ["Lightning Spell", "Ice Spell", "Fire Spell"]
@@ -1431,6 +1538,7 @@ class BattleModel(Model):
         self.entities = []
         self.buttons = []
         self._encounter_over = False
+        self.add_observer(audio_system.get_events())
     
     def load(self) -> None:
         #self._gfx_objects.clear()
@@ -1636,6 +1744,7 @@ class BattleModel(Model):
                                                     self.current_actor.y, 0, 0, 
                                                     OBJECT_TYPE_ICE_SPELL, 
                                                     ANIMATION_TYPE_IDLE))
+            self.publish(Message(EVENT_TYPE_ATTACK, OBJECT_TYPE_ICE_SPELL, self))
         elif self.current_move == "Fire Spell":
             self.animated_entities.append(AnimatedEntity(self.current_target.x, 
                                                     self.current_actor.y, 0, 0, 
@@ -1780,7 +1889,7 @@ class BattleView(View):
     def draw(self, background: Entity, actors: list[Actor],
              buttons: list[Button], current_target: Actor,
              lightning_bolts: list[Entity],
-             vfx: list[AnimatedEntity]) -> None:
+             vfx: list[AnimatedEntity], current_actor: Actor) -> None:
         
         self._draw_entity_image(background)
 
@@ -1800,6 +1909,11 @@ class BattleView(View):
             rect = [dst_rect[0], dst_rect[1], 100, 10]
             pg.draw.rect(self._screen, (0, 0, 0), rect, 4)
         
+        rect = [325, 375, 275, 175]
+        pg.draw.rect(self._screen, (0, 0, 0), rect, 4)
+        if current_actor is not None:
+            self._draw_text(current_actor.get_name(), 325, 345, (0,0,0))
+        
         for button in buttons:
             self.draw_button(button)
         
@@ -1809,10 +1923,10 @@ class BattleView(View):
             self._screen.blit(image, dst_rect)
         
         for bolt in lightning_bolts:
-            self._draw_entity_image(bolt, cam_y = 20)
+            self._draw_entity_image(bolt, cam_y = -20)
         
         for effect in vfx:
-            self._draw_animated_entity(effect, cam_x = SCREEN_WIDTH / 5)
+            self._draw_animated_entity(effect, cam_x = 200, cam_y = -50)
 
         
         self._finish_drawing()
@@ -2050,6 +2164,11 @@ class BattleController(Controller):
             object_type = OBJECT_TYPE_BUTTON,
             event_type = EVENT_TYPE_MOUSE_CLICK,
             filename = "sfx/click_3.wav")
+        
+        audio_system.load_sfx(
+            object_type=OBJECT_TYPE_ICE_SPELL,
+            event_type = EVENT_TYPE_ATTACK,
+            filename = "sfx/ice_spell.wav")
     
     def _draw(self) -> None:
         self._view.draw(
@@ -2058,7 +2177,8 @@ class BattleController(Controller):
             self._model.buttons,
             self._model.current_target,
             self._model.get_entities(),
-            self._model.get_animated_entities())
+            self._model.get_animated_entities(),
+            self._model.current_actor)
     
     def _update_world(self) -> int:
         audio_system.update()
@@ -2071,8 +2191,285 @@ class BattleController(Controller):
     def _mouse_clicked(self):
         self._model.handle_click(self._mouse_pos[0], self._mouse_pos[1])
 #endregion
+#region Console
+class ConsoleModel(Model):
+
+    MAX_LINE_LENGTH = 25
+    MAX_LINE_COUNT = 10
+
+    def __init__(self):
+        super().__init__()
+        self._gfx_objects: list[int] = []
+        audio_system.load_track("hacking", "music/hacking.wav")
+        audio_system.start_music("hacking")
+        
+        self._top_line = ";; x = y + 1"
+        self._buffer: list[str] = ["" for _ in range(ConsoleModel.MAX_LINE_COUNT)]
+        self.add_observer(audio_system.get_events())
+
+        self.cursor_pos = 0
+        self.cursor_line = 0
+
+        self._declare_gfx(OBJECT_TYPE_CONSOLE)
+        self._declare_gfx(OBJECT_TYPE_GEAR)
+        self.should_exit = False
+
+        self.playhead = 0
+        self.timer = None
+
+        self.memory = [0 for _ in range(10)]
+        self.stack = [0 for _ in range[10]]
+
+        #TODO: Make buttons
+    
+    def get_top_line(self) -> str:
+        return self._top_line
+    
+    def get_buffer(self) -> list[str]:
+        buffer = self._buffer.copy()
+        buffer[self.cursor_line] = (
+            buffer[self.cursor_line][:self.cursor_pos] 
+            + "|" 
+            + buffer[self.cursor_line][self.cursor_pos:])
+        return buffer
+        
+    def _declare_gfx(self, object_type: int) -> None:
+        if object_type not in self._gfx_objects:
+            self._gfx_objects.append(object_type)
+    
+    def get_gfx_objects(self) -> list[int]:
+        return self._gfx_objects
+
+    def get_memory(self) -> list[int]:
+        return self.memory
+    
+    def update(self) -> int:
+
+        if self.should_exit:
+            return GAME_PHASE_OVERWORLD
+        
+        if self.timer is not None:
+            if self.timer.is_ellapsed():
+                self.run_line(self.playhead)
+                self.playhead += 1
+                if self.playhead < ConsoleModel.MAX_LINE_COUNT:
+                    self.timer = Timer(60)
+
+        #TODO: update buttons
+        pass
+
+        return GAME_PHASE_NO_CHANGE
+    
+    def run_line(self, line_number: int):
+        
+        line = self.buffer[line_number].strip()
+        words = line.split(" ")
+
+        if words[0] == "push":
+            #TODO: Push onto stack
+            pass
+        if words[0] == "pop":
+            #TODO: Pop from stack
+            pass
+        if words[0] == "add":
+            #TODO: add operation
+            pass
+        if words[0] == "sub":
+            #TODO: sub operation
+            pass
+        if words[0] == "mul":
+            #TODO: mul op
+            pass
+        if words[0] == "load":
+            #TODO: load op
+            pass
+        if words[0] == "store":
+            #TODO: store op
+            pass
+            
+    
+    def key_pressed(self, key: int) -> None:
+
+        if key == pg.K_RETURN:
+            self.publish(Message(EVENT_TYPE_MACHINE_RESET,
+                                OBJECT_TYPE_MODEL, self))
+        else:
+            self.publish(Message(EVENT_TYPE_MACHINE_TICK,
+                                OBJECT_TYPE_MODEL, self))
+        
+        if key == pg.K_ESCAPE:
+            self.should_exit = True
+            return
+
+        if key == pg.K_LEFT:
+            self.cursor_pos -= 1
+            if self.cursor_pos < 0:
+                if self.cursor_line > 0:
+                    self.cursor_line -= 1
+                    self.cursor_pos = len(self._buffer[self.cursor_line])
+                else:
+                    self.cursor_line = len(self._buffer) - 1
+                    self.cursor_pos = len(self._buffer[self.cursor_line])
+            return
+        
+        if key == pg.K_RIGHT:
+            self.cursor_pos += 1
+            if self.cursor_pos > ConsoleModel.MAX_LINE_LENGTH:
+                if self.cursor_line < ConsoleModel.MAX_LINE_COUNT:
+                    self.cursor_line += 1
+                    self.cursor_pos = 0
+                else:
+                    self.cursor_pos = 0
+                    self.cursor_line = 0
+            return
+        
+        if key == pg.K_UP:
+            self.cursor_line = (self.cursor_line - 1) % len(self._buffer)
+            self.cursor_pos = min(self.cursor_pos, len(self._buffer[self.cursor_line]))
+            return
+        
+        if key == pg.K_DOWN:
+            self.cursor_line = (self.cursor_line + 1) % len(self._buffer)
+            self.cursor_pos = min(self.cursor_pos, len(self._buffer[self.cursor_line]))
+            return
+
+        if key == pg.K_RETURN:
+            self.cursor_line += 1
+            self.cursor_pos = 0
+            return
+        
+        if key == pg.K_BACKSPACE:
+            if self.cursor_pos > 0:
+                self._buffer[self.cursor_line] = (
+                    self._buffer[self.cursor_line][:self.cursor_pos - 1] 
+                    + self._buffer[self.cursor_line][self.cursor_pos:])
+                self.cursor_pos -= 1
+            elif (self.cursor_line) > 0:
+                self.cursor_line -= 1
+                self.cursor_pos = len(self.cursor_line - 1)
+                self._buffer[self.cursor_line] = \
+                    self._buffer[self.cursor_line][:self.cursor_pos] 
+        
+        else:
+            if len(self._buffer) == 0 or (len(self._buffer[self.cursor_line])
+                   < ConsoleModel.MAX_LINE_LENGTH):
+                self._buffer[self.cursor_line] += chr(key)
+                self.cursor_pos += 1
+
+    def handle_click(self):
+        self.timer = Timer(60)
+
+class ConsoleView(View, Observable):
+
+    def __init__(self, screen: Surface):
+        View.__init__(self, screen)
+        Observable.__init__(self)
+        self.gear_angle = 0
+    
+    def load_gfx_objects(self, gfx_objects: list[int]) -> None:
+        for object_type in gfx_objects:
+            self.load_gfx(object_type)
+    
+    def update(self):
+        for event in self._event_queue:
+            if event.event_type in (EVENT_TYPE_MACHINE_TICK,
+                                    EVENT_TYPE_MACHINE_RESET):
+                self.gear_angle -= 10
+                self.gear_angle = self.gear_angle % 360
+        self._event_queue.clear()
+
+    
+    def draw(self, top_line: str,
+             buffer: list[str],
+             memory: list[int]) -> None:
+
+        self._screen.fill((196, 196, 196))
+
+        object_type = OBJECT_TYPE_CONSOLE
+        
+        if object_type not in self._images:
+            return
+        
+        image = self._images[object_type]
+        dst_rect = (75, -10)
+        self._screen.blit(image, dst_rect)
+
+        self._draw_text(top_line, 200, 75, (0, 32, 0))
+        for i, line in enumerate(buffer):
+            self._draw_text(line, 200, 75 + 25 * (i + 1), (0, 32, 0))
+
+        for i, value in enumerate(memory):
+            self._draw_text(value, 200 + 50 * i, 600, (0, 32, 0))
+
+        object_type = OBJECT_TYPE_GEAR
+        
+        if object_type not in self._images:
+            return
+        
+        image = self._images[object_type]
+        dst_rect = (50, 50)
+        new_image = pg.transform.rotate(image, self.gear_angle)
+        new_rect = new_image.get_rect(center = (50,50))
+        self._screen.blit(new_image, new_rect)
+
+        image = self._images[object_type]
+        dst_rect = (SCREEN_WIDTH - 50, SCREEN_HEIGHT - 50)
+        new_image = pg.transform.rotate(image, -self.gear_angle)
+        new_rect = new_image.get_rect(center = (SCREEN_WIDTH - 50, SCREEN_HEIGHT - 50))
+        self._screen.blit(new_image, new_rect)
+        
+        self._finish_drawing()
+
+class ConsoleController(Controller):
+
+    def __init__(self, clock: Clock, screen: Surface):
+        super().__init__(clock)
+        self._load_sfx()
+        self._model = ConsoleModel()
+        self._view = ConsoleView(screen)
+        self._view.load_gfx_objects(self._model.get_gfx_objects())
+        self._model.add_observer(self._view.get_events())
+    
+    def _load_sfx(self) -> None:
+        audio_system.clear_all()
+        
+        audio_system.load_sfx(
+            OBJECT_TYPE_MODEL,
+            EVENT_TYPE_MACHINE_TICK,
+            "sfx/click_1.wav")
+        audio_system.load_sfx(
+            OBJECT_TYPE_MODEL,
+            EVENT_TYPE_MACHINE_TICK,
+            "sfx/click_2.wav")
+        audio_system.load_sfx(
+            OBJECT_TYPE_MODEL,
+            EVENT_TYPE_MACHINE_TICK,
+            "sfx/click_3.wav")
+        
+        audio_system.load_sfx(
+            OBJECT_TYPE_MODEL, 
+            EVENT_TYPE_MACHINE_RESET, 
+            "sfx/windup.wav")
+    
+    def _draw(self) -> None:
+        self._view.draw(self._model.get_top_line(),
+                        self._model.get_buffer(),
+                        self._model.get_memory())
+    
+    def _update_world(self) -> int:
+        audio_system.update()
+        self._view.update()
+
+        return self._model.update()
+    
+    def _key_pressed(self, key):
+        self._model.key_pressed(key)
+    
+    def _mouse_clicked(self):
+        return self._model.handle_click()
+#endregion
 def main():
-    next_phase = GAME_PHASE_LOGO
+    next_phase = GAME_PHASE_CONSOLE
     while next_phase != GAME_PHASE_EXIT:
         if next_phase == GAME_PHASE_LOGO:
             controller = LogoController(clock, screen)
@@ -2082,5 +2479,7 @@ def main():
             controller = OverworldController(clock, screen)
         elif next_phase == GAME_PHASE_BATTLE:
             controller = BattleController(clock, screen)
+        elif next_phase == GAME_PHASE_CONSOLE:
+            controller = ConsoleController(clock, screen)
         next_phase = controller.run()
 main()

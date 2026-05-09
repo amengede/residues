@@ -144,11 +144,11 @@ IMAGE_DESCRIPTORS = {
 	},
 	OBJECT_TYPE_BLANK_PAGE: {
 		"filename": "img/blank_page.png",
-		"scale": 8.0,
+		"scale": 4.0,
 	},
 	OBJECT_TYPE_CONSOLE: {
 		"filename": "img/console.png",
-		"scale": 0.25,
+		"scale": 0.27,
 	},
     OBJECT_TYPE_DEMON_ATTACK: {
 		"filename": "img/demon_attack.png",
@@ -168,7 +168,7 @@ IMAGE_DESCRIPTORS = {
 	},
     OBJECT_TYPE_GEAR: {
 		"filename": "img/gear.png",
-		"scale": 1.0,
+		"scale": 0.25,
 	},
 	OBJECT_TYPE_GHOST_ARCHER_ATTACK: {
 		"filename": "img/ghost_archer_attack.png",
@@ -221,11 +221,11 @@ IMAGE_DESCRIPTORS = {
 	},
 	OBJECT_TYPE_NPC_A_PORTRAIT: {
 		"filename": "img/npc_a_portrait.png",
-		"scale": 1.0,
+		"scale": 0.25,
 	},
 	OBJECT_TYPE_NPC_B_PORTRAIT: {
 		"filename": "img/npc_b_portrait.png",
-		"scale": 1.0,
+		"scale": 0.25,
 	},
 	OBJECT_TYPE_NPC_OVERWORLD_DOWN: {
 		"filename": "img/npc_overworld_down.png",
