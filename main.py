@@ -135,7 +135,12 @@ class MenuModel(Model):
             object_type = OBJECT_TYPE_TITLE_SCREEN)
         self._objects[OBJECT_TYPE_TITLE_SCREEN] = [background]
 
-        #TODO: Title
+        self._gfx_objects.append(OBJECT_TYPE_LABEL_RESIDUES)
+        title = Entity(
+            x = 100, y = 50,
+            width = 100, height = 50,
+            object_type = OBJECT_TYPE_LABEL_RESIDUES)
+        self._objects[OBJECT_TYPE_LABEL_RESIDUES] = [title]
 
         #TODO: New Game Button
 
@@ -160,6 +165,8 @@ class MenuView(View):
     def draw(self, objects: dict[int, list[Entity]]) -> None:
 
         self._draw_entity_image(objects[OBJECT_TYPE_TITLE_SCREEN][0])
+
+        self._draw_entity_image(objects[OBJECT_TYPE_LABEL_RESIDUES][0])
 
         self._finish_drawing()
 

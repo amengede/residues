@@ -175,7 +175,7 @@ IMAGE_DESCRIPTORS = {
 	},
 	OBJECT_TYPE_LABEL_RESIDUES: {
 		"filename": "img/label_residues.png",
-		"scale": 1.0,
+		"scale": 0.3,
 	},
 	OBJECT_TYPE_LABEL_START: {
 		"filename": "img/label_start.png",
