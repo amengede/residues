@@ -871,19 +871,19 @@ class OverworldModel(Model):
         
         health = random.randint(8, 15)
         damage = random.randint(10, 18)
-        return f"demon {health} {damage}\n"
+        return f"demon {health}/{health} {damage}\n"
 
     def make_ghost_archer(self) -> str:
         
         health = random.randint(20, 25)
         damage = random.randint(12, 20)
-        return f"ghost_archer {health} {damage}\n"
+        return f"ghost_archer {health}/{health} {damage}\n"
 
     def make_mage(self) -> str:
         
         health = random.randint(10, 25)
         damage = random.randint(10, 20)
-        return f"mage {health} {damage}\n"
+        return f"mage {health}/{health} {damage}\n"
 
     def update(self) -> int:
 
@@ -895,6 +895,7 @@ class OverworldModel(Model):
                         OverworldModel.fresh = False
                         self.save("levels/temp.txt")
                         self.generate_encounter()
+                        audio_system.stop_music("overworld")
                         return GAME_PHASE_BATTLE
         self.clear_events()
 
@@ -1015,8 +1016,951 @@ class OverworldController(Controller):
     def _key_pressed(self, key):
         self._model.key_pressed(key)
 #endregion
+#region Battle
+class Actor(Observable):
+
+    def __init__(self, name: str, health: int,
+                 max_health: int, damage: int,
+                 display: int, x, y):
+        super().__init__()
+        self._name = name
+        self._health = health
+        self._max_health = max_health
+        self._damage = damage
+        self._friendly = False
+        self._display = display
+        self._base_type = display
+        self._dx = 0
+        self.x = x
+        self.y = y
+    
+    def get_dx(self) -> float:
+        return self._dx
+    
+    def set_dx(self, dx: float) -> None:
+        self._dx = dx
+
+    def get_name(self) -> str:
+        return self._name
+    
+    def get_health(self) -> int:
+        return self._health
+    
+    def get_max_health(self) -> int:
+        return self._max_health
+    
+    def get_damage(self) -> int:
+        return self._damage
+    
+    def hurt(self):
+        pass
+
+    def kill(self):
+        pass
+
+    def perform_attack(self):
+        pass
+
+    def start_turn(self):
+        pass
+    
+    def take_damage(self, amount: int) -> None:
+        self._health = max(0, self._health - amount)
+        if self._health > 0:
+            self.hurt()
+        else:
+            self.kill()
+    
+    def is_friendly(self) -> bool:
+        return self._friendly
+    
+    def is_alive(self) -> bool:
+        return self._health > 0
+    
+    def get_moves(self) -> list[str]:
+        pass
+    
+    def get_base_type(self) -> int:
+        return self._base_type
+
+class Ada(Actor):
+
+    def __init__(self, health: int, max_health: int, damage: int):
+        super().__init__("Ada Lovelace", health,
+                         max_health, damage, OBJECT_TYPE_ADA_IDLE, 600, 100)
+        self._friendly = True
+        if self._health < 15:
+            self._display = OBJECT_TYPE_ADA_LOW_HEALTH
+    
+    def hurt(self):
+        
+        self._display = OBJECT_TYPE_ADA_HURT
+        self.publish(Message(EVENT_TYPE_HURT,
+                             OBJECT_TYPE_ADA_IDLE, self))
+
+    def kill(self):
+        self._display = OBJECT_TYPE_ADA_DEAD
+        self.publish(Message(EVENT_TYPE_DIE,
+                             OBJECT_TYPE_ADA_IDLE, self))
+
+    def perform_attack(self):
+        self._display = OBJECT_TYPE_ADA_ATTACK
+        self.publish(Message(EVENT_TYPE_ATTACK,
+                             OBJECT_TYPE_ADA_IDLE, self))
+
+    def start_turn(self):
+        
+        if self._health < 15:
+            self._display = OBJECT_TYPE_ADA_LOW_HEALTH
+            self.publish(Message(EVENT_TYPE_LOW_HEALTH,
+                                 OBJECT_TYPE_ADA_IDLE, self))
+        else:
+            self.publish(Message(EVENT_TYPE_START_TURN,
+                                 OBJECT_TYPE_ADA_IDLE, self))
+    
+    def get_moves(self) -> list[str]:
+        return ["Ice Spell", "Lightning Spell", "Fire Spell"]
+
+class Babbage(Actor):
+
+    def __init__(self, health: int, max_health: int, damage: int):
+        super().__init__("Charles Babbage", health, max_health,
+                         damage, OBJECT_TYPE_BABBAGE_IDLE, 600, 200)
+        self._friendly = True
+        if self._health < 15:
+            self._display = OBJECT_TYPE_BABBAGE_LOW_HEALTH
+    
+    def get_moves(self) -> list[str]:
+        return ["Bash"]
+    
+    def hurt(self):
+        
+        self._display = OBJECT_TYPE_BABBAGE_HURT
+        self.publish(Message(EVENT_TYPE_HURT,
+                             OBJECT_TYPE_BABBAGE_IDLE, self))
+
+    def kill(self):
+        self._display = OBJECT_TYPE_BABBAGE_DEAD
+        self.publish(Message(EVENT_TYPE_DIE,
+                             OBJECT_TYPE_BABBAGE_IDLE, self))
+
+    def perform_attack(self):
+        self._display = OBJECT_TYPE_BABBAGE_ATTACK
+        self.publish(Message(EVENT_TYPE_ATTACK,
+                             OBJECT_TYPE_BABBAGE_IDLE, self))
+
+    def start_turn(self):
+        
+        if self._health < 15:
+            self._display = OBJECT_TYPE_BABBAGE_LOW_HEALTH
+            self.publish(Message(EVENT_TYPE_LOW_HEALTH,
+                                 OBJECT_TYPE_BABBAGE_IDLE, self))
+        else:
+            self.publish(Message(EVENT_TYPE_START_TURN,
+                                 OBJECT_TYPE_BABBAGE_IDLE, self))
+
+class Alice(Actor):
+
+    def __init__(self, health: int, max_health: int, damage: int):
+        super().__init__("Alice Liddell", health, max_health,
+                         damage, OBJECT_TYPE_ALICE_IDLE, 600, 300)
+        self._friendly = True
+        if self._health < 15:
+            self._display = OBJECT_TYPE_ALICE_LOW_HEALTH
+    
+    def get_moves(self) -> list[str]:
+        return ["Slingshot"]
+    
+    def hurt(self):
+        self._display = OBJECT_TYPE_ALICE_HURT
+        self.publish(Message(EVENT_TYPE_HURT,
+                             OBJECT_TYPE_ALICE_IDLE, self))
+
+    def kill(self):
+        self._display = OBJECT_TYPE_ALICE_DEAD
+        self.publish(Message(EVENT_TYPE_DIE,
+                             OBJECT_TYPE_ADA_IDLE, self))
+
+    def perform_attack(self):
+        self._display = OBJECT_TYPE_ALICE_ATTACK
+        self.publish(Message(EVENT_TYPE_ATTACK,
+                             OBJECT_TYPE_ALICE_IDLE, self))
+
+    def start_turn(self):
+        
+        if self._health < 15:
+            self._display = OBJECT_TYPE_ALICE_LOW_HEALTH
+            self.publish(Message(EVENT_TYPE_LOW_HEALTH,
+                                 OBJECT_TYPE_ALICE_IDLE, self))
+        else:
+            self.publish(Message(EVENT_TYPE_START_TURN,
+                                 OBJECT_TYPE_ALICE_IDLE, self))
+
+class Demon(Actor):
+
+    def __init__(self, health: int, max_health: int, damage: int, i: int):
+        super().__init__("Demon", health, max_health,
+                         damage, OBJECT_TYPE_DEMON_IDLE, 200, 100 * i)
+    
+    def get_moves(self) -> list[str]:
+        return ["Stabby Stabby"]
+    
+    def hurt(self):
+        self._display = OBJECT_TYPE_DEMON_HURT
+        self.publish(Message(EVENT_TYPE_HURT,
+                             OBJECT_TYPE_DEMON_IDLE, self))
+
+    def kill(self):
+        self._display = OBJECT_TYPE_DEMON_DEAD
+        self.publish(Message(EVENT_TYPE_DIE,
+                             OBJECT_TYPE_DEMON_IDLE, self))
+
+    def perform_attack(self):
+        self._display = OBJECT_TYPE_DEMON_ATTACK
+        self.publish(Message(EVENT_TYPE_ATTACK,
+                             OBJECT_TYPE_DEMON_IDLE, self))
+    
+class GhostArcher(Actor):
+
+    def __init__(self, health: int, max_health: int, damage: int, i: int):
+        super().__init__("Ghost Archer", health, max_health, damage,
+                         OBJECT_TYPE_GHOST_ARCHER_IDLE, 200, 100 * i)
+    
+    def get_moves(self) -> list[str]:
+        return ["Shoot"]
+    
+    def hurt(self):
+        self._display = OBJECT_TYPE_GHOST_ARCHER_HURT
+        self.publish(Message(EVENT_TYPE_HURT,
+                             OBJECT_TYPE_GHOST_ARCHER_IDLE, self))
+
+    def kill(self):
+        self._display = OBJECT_TYPE_GHOST_ARCHER_DEAD
+        self.publish(Message(EVENT_TYPE_DIE,
+                             OBJECT_TYPE_GHOST_ARCHER_IDLE, self))
+
+    def perform_attack(self):
+        self._display = OBJECT_TYPE_GHOST_ARCHER_ATTACK
+        self.publish(Message(EVENT_TYPE_ATTACK,
+                             OBJECT_TYPE_GHOST_ARCHER_IDLE, self))
+
+class Mage(Actor):
+
+    def __init__(self, health: int, max_health: int, damage: int, i: int):
+        super().__init__("Mage", health, max_health,
+                         damage, OBJECT_TYPE_MAGE_IDLE, 200, 100 * i)
+        self._friendly = True
+    
+    def get_moves(self) -> list[str]:
+        return ["Lightning Spell", "Ice Spell", "Fire Spell"]
+
+    def hurt(self):
+        self._display = OBJECT_TYPE_MAGE_HURT
+        self.publish(Message(EVENT_TYPE_HURT,
+                             OBJECT_TYPE_MAGE_IDLE, self))
+
+    def kill(self):
+        self._display = OBJECT_TYPE_MAGE_DEAD
+        self.publish(Message(EVENT_TYPE_DIE,
+                             OBJECT_TYPE_MAGE_IDLE, self))
+
+    def perform_attack(self):
+        self._display = OBJECT_TYPE_MAGE_ATTACK
+        self.publish(Message(EVENT_TYPE_ATTACK,
+                             OBJECT_TYPE_MAGE_IDLE, self))
+
+class Encounter:
+
+    def __init__(self):
+        self._actors = []
+        self._pending_actors = []
+        self._current_actor_index = -1
+        self._friendly_count = 0
+        self._unfriendly_count = 0
+    
+    def add_actor(self, actor: Actor):
+        if actor.is_friendly():
+            self._friendly_count += 1
+        else:
+            self._unfriendly_count += 1
+        
+        self._actors.append(actor)
+        self._pending_actors.append(actor)
+    
+    def register_death(self, actor: Actor):
+        if actor.is_friendly():
+            self._friendly_count -= 1
+        else:
+            self._unfriendly_count -= 1
+    
+    def choose_actor(self) -> Actor:
+        if len(self._pending_actors) == 0:
+            self.reshuffle()
+        
+        if len(self._pending_actors) == 0:
+            return None
+        
+        actor = random.choice(self._pending_actors)
+        self._current_actor_index = self._actors.index(actor)
+        return actor
+    
+    def reshuffle(self) -> None:
+        for actor in self._actors:
+            if actor.is_alive():
+                self._pending_actors.append(actor)
+
+    def over(self) -> bool:
+        return (self._friendly_count == 0
+                or self._unfriendly_count == 0)
+    
+    def won(self) -> bool:
+        return (self._unfriendly_count == 0
+                and self._friendly_count > 0)
+    
+    def get_next_target(self, friendly: bool):
+        for i in range(len(self._actors)):
+            self._current_actor_index += 1
+            target = self._actors[(self._current_actor_index) 
+                                  % len(self._actors)]
+            if (not target.is_alive()
+                or target.is_friendly != friendly):
+                continue
+            return target
+        
+    def get_previous_target(self, friendly: bool):
+        for i in range(len(self._actors)):
+            self._current_actor_index -= 1
+            target = self._actors[(self._current_actor_index) 
+                                  % len(self._actors)]
+            if (not target.is_alive()
+                or target.is_friendly != friendly):
+                continue
+            return target
+    
+    def get_actors(self) -> list[Actor]:
+        return self._actors
+
+    def get_counts(self) -> tuple[int]:
+        return (self._unfriendly_count, self._friendly_count)
+
+class BattleModel(Model):
+
+    STATE_TURN_START = 0
+    STATE_SELECT_MOVE = 1
+    STATE_SELECT_TARGET = 2
+    STATE_ATTACK = 3
+    STATE_TARGET_DAMAGED = 4
+    STATE_CHOOSE_ACTOR = 5
+    STATE_NO_CHANGE = 6
+
+    def __init__(self):
+        super().__init__()
+        self._gfx_objects: list[int] = []
+        audio_system.load_track("combat", "music/combat.wav")
+        audio_system.start_music("combat")
+        self.load()
+        self.current_actor = self._encounter.choose_actor()
+        self.current_target: Actor = None
+        self.current_move: str = ""
+        self._target_x = 0
+        self._timer = None
+
+        self.states = {
+            self.STATE_TURN_START: {
+                "enter": self.enter_turn_start,
+                "update": self.update_turn_start,
+                "exit": self.exit_turn_start,
+            },
+            self.STATE_SELECT_MOVE: {
+                "enter": self.enter_select_move,
+                "update": self.update_select_move,
+                "exit": self.exit_select_move,
+            },
+            self.STATE_SELECT_TARGET: {
+                "enter": self.enter_select_target,
+                "update": self.update_select_target,
+                "exit": self.exit_select_target,
+            },
+            self.STATE_ATTACK: {
+                "enter": self.enter_attack,
+                "update": self.update_attack,
+                "exit": self.exit_attack,
+            },
+            self.STATE_TARGET_DAMAGED: {
+                "enter": self.enter_target_damaged,
+                "update": self.update_target_damaged,
+                "exit": self.exit_target_damaged,
+            },
+            self.STATE_CHOOSE_ACTOR: {
+                "enter": self.enter_choose_actor,
+                "update": self.update_choose_actor,
+                "exit": self.exit_choose_actor,
+            },
+        }
+        self.state = self.STATE_CHOOSE_ACTOR
+        self.states[self.state]["enter"]()
+
+        self.animated_entities = []
+        self.entities = []
+        self.buttons = []
+        self._encounter_over = False
+        self.monster_count = 0
+    
+    def load(self) -> None:
+        self._gfx_objects.clear()
+        self._encounter = Encounter()
+        self._declare_gfx(OBJECT_TYPE_LIGHTNING_BOLT)
+        self._declare_gfx(OBJECT_TYPE_ICE_SPELL)
+        self._declare_gfx(OBJECT_TYPE_FIRE_SPELL)
+        
+        with open("levels/party.txt", "r") as file:
+            while line := file.readline():
+                line = line.replace("\n", "")
+                words = line.split()
+
+                if words[0] == "ada":
+                    self._declare_gfx(OBJECT_TYPE_ADA_ATTACK)
+                    self._declare_gfx(OBJECT_TYPE_ADA_DEAD)
+                    self._declare_gfx(OBJECT_TYPE_ADA_HURT)
+                    self._declare_gfx(OBJECT_TYPE_ADA_IDLE)
+                    self._declare_gfx(OBJECT_TYPE_ADA_LOW_HEALTH)
+                    self._make_actor(words, Ada)
+                if words[0] == "babbage":
+                    self._declare_gfx(OBJECT_TYPE_BABBAGE_ATTACK)
+                    self._declare_gfx(OBJECT_TYPE_BABBAGE_DEAD)
+                    self._declare_gfx(OBJECT_TYPE_BABBAGE_HURT)
+                    self._declare_gfx(OBJECT_TYPE_BABBAGE_IDLE)
+                    self._declare_gfx(OBJECT_TYPE_BABBAGE_LOW_HEALTH)
+                    self._make_actor(words, Babbage)
+                if words[0] == "alice":
+                    self._declare_gfx(OBJECT_TYPE_ALICE_ATTACK)
+                    self._declare_gfx(OBJECT_TYPE_ALICE_DEAD)
+                    self._declare_gfx(OBJECT_TYPE_ALICE_HURT)
+                    self._declare_gfx(OBJECT_TYPE_ALICE_IDLE)
+                    self._declare_gfx(OBJECT_TYPE_ALICE_LOW_HEALTH)
+                    self._make_actor(words, Alice)
+        
+        with open("levels/encounter.txt", "r") as file:
+            while line := file.readline():
+                line = line.replace("\n", "")
+                words = line.split()
+
+                if words[0] == "demon":
+                    self._declare_gfx(OBJECT_TYPE_DEMON_ATTACK)
+                    self._declare_gfx(OBJECT_TYPE_DEMON_DEAD)
+                    self._declare_gfx(OBJECT_TYPE_DEMON_HURT)
+                    self._declare_gfx(OBJECT_TYPE_DEMON_IDLE)
+                    self._make_actor(words, Demon)
+                if words[0] == "ghost_archer":
+                    self._declare_gfx(OBJECT_TYPE_GHOST_ARCHER_ATTACK)
+                    self._declare_gfx(OBJECT_TYPE_GHOST_ARCHER_DEAD)
+                    self._declare_gfx(OBJECT_TYPE_GHOST_ARCHER_HURT)
+                    self._declare_gfx(OBJECT_TYPE_GHOST_ARCHER_IDLE)
+                    self._make_actor(words, GhostArcher)
+                if words[0] == "mage":
+                    self._declare_gfx(OBJECT_TYPE_MAGE_ATTACK)
+                    self._declare_gfx(OBJECT_TYPE_MAGE_DEAD)
+                    self._declare_gfx(OBJECT_TYPE_MAGE_HURT)
+                    self._declare_gfx(OBJECT_TYPE_MAGE_IDLE)
+                    self._make_actor(words, Mage)
+    
+    def _declare_gfx(self, object_type: int) -> None:
+        if object_type not in self._gfx_objects:
+            self._gfx_objects.append(object_type)
+    
+    def get_gfx_objects(self) -> list[int]:
+        return self._gfx_objects
+
+    def save(self) -> None:
+        
+        with open("levels/party.txt", "w") as file:
+            for actor in self._encounter.get_actors():
+                if not actor.is_friendly():
+                    continue
+                file.write(self._save_actor())
+    
+    def _make_actor(self, words: list[str], _class) -> None:
+
+        health, _, max_health = words[1].partition("/")
+        health = int(health)
+        max_health = int(max_health)
+        damage = int(words[2])
+        if words[0] in ("demon", "ghost_archer", "mage"):
+            actor: Actor = _class(health, max_health, damage, self.monster_count)
+            self._monster_count += 1
+        else:
+            actor: Actor = _class(health, max_health, damage, self.monster_count)
+        self._encounter.add_actor(actor)
+    
+    def _save_actor(self, actor: Actor) -> str:
+        formal_name = actor.get_name()
+        name = ""
+        if formal_name == "Ada Lovelace":
+            name = "ada"
+        elif formal_name == "Charles Babbage":
+            name = "babbage"
+        elif formal_name == "Alice Liddell":
+            name = "alice"
+        
+        health = actor.get_health()
+        max_health = actor.get_max_health()
+        damage = actor.get_damage()
+
+        return f"{name} {health}/{max_health} {damage}\n"
+    
+    def enter_turn_start(self) -> None:
+        
+        self.current_actor.start_turn()
+        self._timer = Timer(120)
+
+        if self.current_actor.is_friendly():
+            self._target_x = -100
+        else:
+            self._target_x = 100
+
+    def update_turn_start(self) -> int:
+        
+        self._timer.update()
+        if (self._timer.is_ellapsed()):
+            return self.STATE_SELECT_MOVE
+
+        dx = self.current_actor.get_dx()
+        if self.current_actor.is_friendly():
+            dx = max(self._target_x, dx - 1)
+        else:
+            dx = max(self._target_x, dx + 1)
+        self.current_actor.set_dx(dx)
+        return self.STATE_NO_CHANGE
+    
+    def exit_turn_start(self) -> None:
+        pass
+
+    def enter_select_move(self) -> None:
+        
+        if self.current_actor.is_friendly():
+            moves = self.current_actor.get_moves()
+            self.buttons: list[Button] = []
+            for i,move in enumerate(moves):
+                self.buttons.append(Button(450, 300 + 50 * i, 100, 50, text = move))
+    
+    def update_select_move(self) -> int:
+        
+        if not self.current_actor.is_friendly():
+            #randomly choose a move!
+            moves = self.current_actor.get_moves()
+            self.current_move = random.choice(moves)
+            return self.STATE_SELECT_TARGET
+        
+        # if the character is friendly, then we must wait for the user
+        # to click a button.
+        return self.STATE_NO_CHANGE
+    
+    def exit_select_move(self) -> None:
+        self.buttons.clear()
+    
+    def enter_select_target(self) -> None:
+
+        self.current_target = self._encounter.get_next_target(
+            not self.current_actor.is_friendly())
+        
+    def update_select_target(self) -> int:
+
+        if not self.current_actor.is_friendly():
+            #randomly choose a target
+            for i in range(random.randint(0, 3)):
+                self.current_target = self._encounter.get_next_target(True)
+            return self.STATE_ATTACK
+        
+        # if the character is friendly, then we must wait for the user
+        # to select a target
+        return self.STATE_NO_CHANGE
+    
+    def exit_select_target(self) -> None:
+        pass
+
+    def enter_attack(self) -> None:
+        self.current_actor.perform_attack()
+        self._timer = Timer(120)
+    
+    def update_attack(self) -> int:
+        self._timer.update()
+        if self._timer.is_ellapsed():
+            return self.STATE_TARGET_DAMAGED
+    
+    def exit_attack(self) -> None:
+        pass
+
+    def enter_target_damaged(self) -> None:
+        damage = self.current_actor.get_damage() + random.randint(1, 5)
+        self.current_target.take_damage(damage)
+        if self.current_move == "Ice Spell":
+            self.animated_entities.append(AnimatedEntity(self.current_target.x, 
+                                                    self.current_actor.y, 0, 0, 
+                                                    OBJECT_TYPE_ICE_SPELL, 
+                                                    ANIMATION_TYPE_IDLE))
+        elif self.current_move == "Fire Spell":
+            self.animated_entities.append(AnimatedEntity(self.current_target.x, 
+                                                    self.current_actor.y, 0, 0, 
+                                                    OBJECT_TYPE_FIRE_SPELL, 
+                                                    ANIMATION_TYPE_IDLE))
+        elif self.current_move == "Lightning Spell":
+            self.entities.append(Entity(self.current_target.x, 
+                                        self.current_actor.y, 0, 0, 
+                                                    OBJECT_TYPE_LIGHTNING_BOLT))
+        self.current_target = None
+        self.timer = Timer(120)
+    
+    def update_target_damaged(self) -> int:
+        self._timer.update()
+        if self._timer.is_ellapsed():
+            return self.STATE_CHOOSE_ACTOR
+    
+    def exit_target_damaged(self) -> None:
+        self.entities.clear()
+        self.animated_entities.clear()
+        self.current_actor.set_dx(0)
+
+        if self._encounter.over:
+            self._encounter_over = True
+    
+    def enter_choose_actor(self) -> None:
+        self.current_actor = self._encounter.choose_actor()
+    
+    def update_choose_actor(self) -> int:
+        return self.STATE_TURN_START
+    
+    def exit_choose_actor(self) -> None:
+        pass
+
+    def get_actors(self) -> list[Actor]:
+        
+        return self._encounter.get_actors()
+    
+    def get_current_target(self) -> Actor | None:
+        return self.current_target
+    
+    def get_entities(self) -> list[Entity]:
+        return self.entities
+    
+    def get_animated_entities(self) -> list[AnimatedEntity]:
+        return self.animated_entities
+    
+    def get_background(self) -> Entity:
+        return self._background
+
+    def update(self) -> int:
+
+        self.clear_events()
+
+        next_state = self.states[self.state]["update"]()
+        if next_state == self.STATE_NO_CHANGE:
+            return GAME_PHASE_NO_CHANGE
+
+        self.states[self.state]["exit"]()
+        self.state = next_state
+        self.states[self.state]["enter"]()
+
+        if self._encounter_over:
+            if self._encounter.won():
+                self.save()
+            return GAME_PHASE_OVERWORLD
+        else:
+            return GAME_PHASE_NO_CHANGE
+    
+    def key_pressed(self, key: int) -> None:
+
+        if self._state == self.STATE_SELECT_TARGET:
+            if key in (pg.K_LEFT, pg.K_UP):
+                self.current_target = self._encounter.get_previous_target(False)
+                self.publish(Message(event_type=EVENT_TYPE_MOUSE_CLICK,
+                                object_type=OBJECT_TYPE_MODEL,
+                                instance = self))
+            if key in (pg.K_RIGHT, pg.K_DOWN):
+                self.current_target = self._encounter.get_next_target(False)
+                self.publish(Message(event_type=EVENT_TYPE_MOUSE_CLICK,
+                                object_type=OBJECT_TYPE_MODEL,
+                                instance = self))
+            
+            if key in (pg.K_SPACE, pg.K_ENTER):
+                self.states[self.state]["exit"]()
+                self.state = self.ATTACK
+                self.states[self.state]["enter"]()
+                self.publish(Message(event_type=EVENT_TYPE_MOUSE_CLICK,
+                                object_type=OBJECT_TYPE_MODEL,
+                                instance = self))
+            
+            if key == pg.K_ESCAPE:
+                self.states[self.state]["exit"]()
+                self.state = self.STATE_SELECT_MOVE
+                self.states[self.state]["enter"]()
+                self.current_target = None
+                self.publish(Message(event_type=EVENT_TYPE_MOUSE_CLICK,
+                                object_type=OBJECT_TYPE_MODEL,
+                                instance = self))
+    
+    def handle_click(self, mouse_x: int, mouse_y: int) -> None:
+        if self.state == self.STATE_SELECT_MOVE:
+            for button in self.buttons:
+                if button.contains(mouse_x, mouse_y):
+                    self.current_move = button._text
+                    self.states[self.state]["exit"]()
+                    self.state = self.STATE_SELECT_TARGET
+                    self.states[self.state]["enter"]()
+                self.publish(Message(event_type=EVENT_TYPE_MOUSE_CLICK,
+                                object_type=OBJECT_TYPE_MODEL,
+                                instance = self))
+
+class BattleView(View):
+
+    def __init__(self, screen: Surface):
+        super().__init__(screen)
+    
+    def load_gfx_objects(self, gfx_objects: list[int]) -> None:
+        for object_type in gfx_objects:
+            self.load_gfx(object_type)
+    
+    def draw(self, background: Entity) -> None:
+        
+        self._draw_entity_image(background)
+        
+        self._finish_drawing()
+
+class BattleController(Controller):
+
+    def __init__(self, clock: Clock, screen: Surface):
+        super().__init__(clock)
+        self._load_sfx()
+        self._model = BattleModel()
+        self._view = BattleView(screen)
+        self._view.load_gfx_objects(self._model.get_gfx_objects())
+    
+    def _load_sfx(self) -> None:
+        audio_system.clear_all()
+
+        audio_system.load_sfx(
+            OBJECT_TYPE_ADA_IDLE, 
+            EVENT_TYPE_ATTACK, "sfx/ada_attack_1.wav")
+        audio_system.load_sfx(
+            OBJECT_TYPE_ADA_IDLE, 
+            EVENT_TYPE_ATTACK, "sfx/ada_attack_2.wav")
+        audio_system.load_sfx(
+            OBJECT_TYPE_ADA_IDLE, 
+            EVENT_TYPE_ATTACK, "sfx/ada_attack_3.wav")
+        
+        audio_system.load_sfx(
+            OBJECT_TYPE_ADA_IDLE, 
+            EVENT_TYPE_DIE, "sfx/ada_die_1.wav")
+        audio_system.load_sfx(
+            OBJECT_TYPE_ADA_IDLE, 
+            EVENT_TYPE_DIE, "sfx/ada_die_2.wav")
+        audio_system.load_sfx(
+            OBJECT_TYPE_ADA_IDLE, 
+            EVENT_TYPE_DIE, "sfx/ada_die_3.wav")
+        
+        audio_system.load_sfx(
+            OBJECT_TYPE_ADA_IDLE, 
+            EVENT_TYPE_HURT, "sfx/ada_hurt_1.wav")
+        audio_system.load_sfx(
+            OBJECT_TYPE_ADA_IDLE, 
+            EVENT_TYPE_HURT, "sfx/ada_hurt_2.wav")
+        audio_system.load_sfx(
+            OBJECT_TYPE_ADA_IDLE, 
+            EVENT_TYPE_HURT, "sfx/ada_hurt_3.wav")
+        
+        audio_system.load_sfx(
+            OBJECT_TYPE_ADA_IDLE, 
+            EVENT_TYPE_LOW_HEALTH, "sfx/ada_low_health.wav")
+        audio_system.load_sfx(
+            OBJECT_TYPE_ADA_IDLE, 
+            EVENT_TYPE_LOW_HEALTH, "sfx/ada_low_health_2.wav")
+        audio_system.load_sfx(
+            OBJECT_TYPE_ADA_IDLE, 
+            EVENT_TYPE_LOW_HEALTH, "sfx/ada_low_health_3.wav")
+        
+        audio_system.load_sfx(
+            OBJECT_TYPE_ADA_IDLE, 
+            EVENT_TYPE_START_TURN, "sfx/ada_start_turn.wav")
+        
+        audio_system.load_sfx(
+            OBJECT_TYPE_ALICE_IDLE, 
+            EVENT_TYPE_ATTACK, "sfx/alice_attack_1.wav")
+        audio_system.load_sfx(
+            OBJECT_TYPE_ALICE_IDLE, 
+            EVENT_TYPE_ATTACK, "sfx/alice_attack_2.wav")
+        audio_system.load_sfx(
+            OBJECT_TYPE_ALICE_IDLE, 
+            EVENT_TYPE_ATTACK, "sfx/alice_attack_3.wav")
+        
+        audio_system.load_sfx(
+            OBJECT_TYPE_ALICE_IDLE, 
+            EVENT_TYPE_DIE, "sfx/alice_die_1.wav")
+        audio_system.load_sfx(
+            OBJECT_TYPE_ALICE_IDLE, 
+            EVENT_TYPE_DIE, "sfx/alice_die_2.wav")
+        audio_system.load_sfx(
+            OBJECT_TYPE_ALICE_IDLE, 
+            EVENT_TYPE_DIE, "sfx/alice_die_3.wav")
+        
+        audio_system.load_sfx(
+            OBJECT_TYPE_ALICE_IDLE, 
+            EVENT_TYPE_HURT, "sfx/ada_hurt_1.wav")
+        audio_system.load_sfx(
+            OBJECT_TYPE_ALICE_IDLE, 
+            EVENT_TYPE_HURT, "sfx/ada_hurt_2.wav")
+        audio_system.load_sfx(
+            OBJECT_TYPE_ALICE_IDLE, 
+            EVENT_TYPE_HURT, "sfx/ada_hurt_3.wav")
+        
+        audio_system.load_sfx(
+            OBJECT_TYPE_ALICE_IDLE, 
+            EVENT_TYPE_LOW_HEALTH, "sfx/ada_low_health.wav")
+        
+        audio_system.load_sfx(
+            OBJECT_TYPE_ALICE_IDLE, 
+            EVENT_TYPE_START_TURN, "sfx/alice_start_turn_1.wav")
+        audio_system.load_sfx(
+            OBJECT_TYPE_ALICE_IDLE, 
+            EVENT_TYPE_START_TURN, "sfx/alice_start_turn_2.wav")
+        
+        audio_system.load_sfx(
+            OBJECT_TYPE_BABBAGE_IDLE, 
+            EVENT_TYPE_ATTACK, "sfx/babbage_attack_1.wav")
+        audio_system.load_sfx(
+            OBJECT_TYPE_BABBAGE_IDLE, 
+            EVENT_TYPE_ATTACK, "sfx/babbage_attack_2.wav")
+        audio_system.load_sfx(
+            OBJECT_TYPE_BABBAGE_IDLE, 
+            EVENT_TYPE_ATTACK, "sfx/babbage_attack_3.wav")
+        
+        audio_system.load_sfx(
+            OBJECT_TYPE_BABBAGE_IDLE, 
+            EVENT_TYPE_DIE, "sfx/babbage_die_1.wav")
+        audio_system.load_sfx(
+            OBJECT_TYPE_BABBAGE_IDLE, 
+            EVENT_TYPE_DIE, "sfx/babbage_die_2.wav")
+        
+        audio_system.load_sfx(
+            OBJECT_TYPE_BABBAGE_IDLE, 
+            EVENT_TYPE_HURT, "sfx/babbage_hurt_1.wav")
+        audio_system.load_sfx(
+            OBJECT_TYPE_BABBAGE_IDLE, 
+            EVENT_TYPE_HURT, "sfx/babbage_hurt_2.wav")
+        audio_system.load_sfx(
+            OBJECT_TYPE_BABBAGE_IDLE, 
+            EVENT_TYPE_HURT, "sfx/babbage_hurt_3.wav")
+        audio_system.load_sfx(
+            OBJECT_TYPE_BABBAGE_IDLE, 
+            EVENT_TYPE_HURT, "sfx/babbage_hurt_4.wav")
+        
+        audio_system.load_sfx(
+            OBJECT_TYPE_BABBAGE_IDLE, 
+            EVENT_TYPE_LOW_HEALTH, "sfx/babbage_low_health.wav")
+        
+        audio_system.load_sfx(
+            OBJECT_TYPE_BABBAGE_IDLE, 
+            EVENT_TYPE_START_TURN, "sfx/babbage_start_turn.wav")
+        
+        audio_system.load_sfx(
+            OBJECT_TYPE_DEMON_IDLE, 
+            EVENT_TYPE_ATTACK, "sfx/demon_attack_1.wav")
+        audio_system.load_sfx(
+            OBJECT_TYPE_DEMON_IDLE, 
+            EVENT_TYPE_ATTACK, "sfx/demon_attack_2.wav")
+        audio_system.load_sfx(
+            OBJECT_TYPE_DEMON_IDLE, 
+            EVENT_TYPE_ATTACK, "sfx/demon_attack_3.wav")
+        audio_system.load_sfx(
+            OBJECT_TYPE_DEMON_IDLE, 
+            EVENT_TYPE_ATTACK, "sfx/demon_attack_4.wav")
+        audio_system.load_sfx(
+            OBJECT_TYPE_DEMON_IDLE, 
+            EVENT_TYPE_ATTACK, "sfx/demon_attack_5.wav")
+        
+        audio_system.load_sfx(
+            OBJECT_TYPE_DEMON_IDLE, 
+            EVENT_TYPE_DIE, "sfx/demon_die_1.wav")
+        audio_system.load_sfx(
+            OBJECT_TYPE_DEMON_IDLE, 
+            EVENT_TYPE_DIE, "sfx/demon_die_2.wav")
+        audio_system.load_sfx(
+            OBJECT_TYPE_DEMON_IDLE, 
+            EVENT_TYPE_DIE, "sfx/demon_die_3.wav")
+        
+        audio_system.load_sfx(
+            OBJECT_TYPE_DEMON_IDLE, 
+            EVENT_TYPE_HURT, "sfx/demon_hurt_1.wav")
+        audio_system.load_sfx(
+            OBJECT_TYPE_DEMON_IDLE, 
+            EVENT_TYPE_HURT, "sfx/demon_hurt_2.wav")
+        audio_system.load_sfx(
+            OBJECT_TYPE_DEMON_IDLE, 
+            EVENT_TYPE_HURT, "sfx/demon_hurt_3.wav")
+        
+        audio_system.load_sfx(
+            OBJECT_TYPE_GHOST_ARCHER_IDLE, 
+            EVENT_TYPE_ATTACK, "sfx/ghost_archer_attack_1.wav")
+        audio_system.load_sfx(
+            OBJECT_TYPE_GHOST_ARCHER_IDLE, 
+            EVENT_TYPE_ATTACK, "sfx/ghost_archer_attack_2.wav")
+        audio_system.load_sfx(
+            OBJECT_TYPE_GHOST_ARCHER_IDLE, 
+            EVENT_TYPE_ATTACK, "sfx/ghost_archer_attack_3.wav")
+        
+        audio_system.load_sfx(
+            OBJECT_TYPE_GHOST_ARCHER_IDLE, 
+            EVENT_TYPE_DIE, "sfx/ghost_archer_die_1.wav")
+        audio_system.load_sfx(
+            OBJECT_TYPE_GHOST_ARCHER_IDLE, 
+            EVENT_TYPE_DIE, "sfx/ghost_archer_die_2.wav")
+        
+        audio_system.load_sfx(
+            OBJECT_TYPE_GHOST_ARCHER_IDLE, 
+            EVENT_TYPE_HURT, "sfx/ghost_archer_hurt.wav")
+        
+        audio_system.load_sfx(
+            OBJECT_TYPE_MAGE_IDLE, 
+            EVENT_TYPE_ATTACK, "sfx/mage_attack_1.wav")
+        audio_system.load_sfx(
+            OBJECT_TYPE_MAGE_IDLE, 
+            EVENT_TYPE_ATTACK, "sfx/mage_attack_2.wav")
+        audio_system.load_sfx(
+            OBJECT_TYPE_MAGE_IDLE, 
+            EVENT_TYPE_ATTACK, "sfx/mage_attack_3.wav")
+        
+        audio_system.load_sfx(
+            OBJECT_TYPE_MAGE_IDLE, 
+            EVENT_TYPE_DIE, "sfx/mage_die_1.wav")
+        audio_system.load_sfx(
+            OBJECT_TYPE_MAGE_IDLE, 
+            EVENT_TYPE_DIE, "sfx/mage_die_2.wav")
+        
+        audio_system.load_sfx(
+            OBJECT_TYPE_MAGE_IDLE, 
+            EVENT_TYPE_HURT, "sfx/mage_hurt_1.wav")
+        audio_system.load_sfx(
+            OBJECT_TYPE_MAGE_IDLE, 
+            EVENT_TYPE_HURT, "sfx/mage_hurt_2.wav")
+        audio_system.load_sfx(
+            OBJECT_TYPE_MAGE_IDLE, 
+            EVENT_TYPE_HURT, "sfx/mage_hurt_3.wav")
+    
+    def _draw(self) -> None:
+        self._view.draw(
+            self._model.get_background())
+    
+    def _update_world(self) -> int:
+        audio_system.update()
+
+        return self._model.update()
+    
+    def _handle_held_keys(self):
+        self._model.handle_keys(self._keys)
+    
+    def _key_pressed(self, key):
+        self._model.key_pressed(key)
+#endregion
 def main():
-    next_phase = GAME_PHASE_LOGO
+    next_phase = GAME_PHASE_BATTLE
     while next_phase != GAME_PHASE_EXIT:
         if next_phase == GAME_PHASE_LOGO:
             controller = LogoController(clock, screen)
@@ -1024,6 +1968,8 @@ def main():
             controller = MenuController(clock, screen)
         elif next_phase == GAME_PHASE_OVERWORLD:
             controller = OverworldController(clock, screen)
+        elif next_phase == GAME_PHASE_BATTLE:
+            controller = BattleController(clock, screen)
         next_phase = controller.run()
 
 main()
