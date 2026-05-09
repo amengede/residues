@@ -63,67 +63,84 @@ ANIMATION_TYPE_IDLE = 0
 IMAGE_DESCRIPTORS = {
 	OBJECT_TYPE_ADA_ATTACK: {
 		"filename": "img/ada_attack.png",
-		"scale": 1.0,
+		"scale": 0.25,
+        "flip": True,
 	},
 	OBJECT_TYPE_ADA_HURT: {
 		"filename": "img/ada_hurt.png",
-		"scale": 1.0,
+		"scale": 0.25,
+        "flip": True,
 	},
 	OBJECT_TYPE_ADA_IDLE: {
 		"filename": "img/ada_idle.png",
-		"scale": 1.0,
+		"scale": 0.25,
+        "flip": True,
 	},
 	OBJECT_TYPE_ADA_DEAD: {
 		"filename": "img/ada_dead.png",
-		"scale": 1.0,
+		"scale": 0.25,
+        "flip": True,
 	},
 	OBJECT_TYPE_ADA_LOW_HEALTH: {
 		"filename": "img/ada_low_health.png",
-		"scale": 1.0,
+		"scale": 0.25,
+        "flip": True,
 	},
 	OBJECT_TYPE_ALICE_DEAD: {
 		"filename": "img/alice_dead.png",
-		"scale": 1.0,
+		"scale": 0.25,
+        "flip": True,
 	},
 	OBJECT_TYPE_ALICE_HURT: {
 		"filename": "img/alice_hurt.png",
-		"scale": 1.0,
+		"scale": 0.25,
+        "flip": True,
 	},
 	OBJECT_TYPE_ALICE_IDLE: {
 		"filename": "img/alice_idle.png",
-		"scale": 1.0,
+		"scale": 0.25,
+        "flip": True,
 	},
 	OBJECT_TYPE_ALICE_ATTACK: {
 		"filename": "img/alice_attack.png",
-		"scale": 1.0,
+		"scale": 0.25,
+        "flip": True,
 	},
 	OBJECT_TYPE_ALICE_LOW_HEALTH: {
 		"filename": "img/alice_low_health.png",
-		"scale": 1.0,
+		"scale": 0.25,
+        "flip": True,
 	},
 	OBJECT_TYPE_ARROW: {
 		"filename": "img/arrow.png",
-		"scale": 1.0,
+		"scale": 0.25,
+        "flip": True,
+        "angle": 90,
 	},
 	OBJECT_TYPE_BABBAGE_ATTACK: {
 		"filename": "img/babbage_attack.png",
-		"scale": 1.0,
+		"scale": 0.25,
+        "flip": True,
 	},
 	OBJECT_TYPE_BABBAGE_DEAD: {
 		"filename": "img/babbage_dead.png",
-		"scale": 1.0,
+		"scale": 0.25,
+        "flip": True,
 	},
 	OBJECT_TYPE_BABBAGE_HURT: {
 		"filename": "img/babbage_hurt.png",
-		"scale": 1.0,
+		"scale": 0.25,
+        "flip": True,
 	},
     OBJECT_TYPE_BABBAGE_IDLE: {
 		"filename": "img/babbage_idle.png",
-		"scale": 1.0,
+		"scale": 0.25,
+        "flip": True,
 	},
 	OBJECT_TYPE_BABBAGE_LOW_HEALTH: {
 		"filename": "img/babbage_low_health.png",
-		"scale": 1.0,
+		"scale": 0.25,
+        "flip": True,
 	},
 	OBJECT_TYPE_BLANK_PAGE: {
 		"filename": "img/blank_page.png",
@@ -131,23 +148,23 @@ IMAGE_DESCRIPTORS = {
 	},
 	OBJECT_TYPE_CONSOLE: {
 		"filename": "img/console.png",
-		"scale": 1.0,
+		"scale": 0.25,
 	},
     OBJECT_TYPE_DEMON_ATTACK: {
 		"filename": "img/demon_attack.png",
-		"scale": 1.0,
+		"scale": 0.25,
 	},
 	OBJECT_TYPE_DEMON_DEAD: {
 		"filename": "img/demon_dead.png",
-		"scale": 1.0,
+		"scale": 0.25,
 	},
 	OBJECT_TYPE_DEMON_HURT: {
 		"filename": "img/demon_hurt.png",
-		"scale": 1.0,
+		"scale": 0.25,
 	},
 	OBJECT_TYPE_DEMON_IDLE: {
 		"filename": "img/demon_idle.png",
-		"scale": 1.0,
+		"scale": 0.2,
 	},
     OBJECT_TYPE_GEAR: {
 		"filename": "img/gear.png",
@@ -155,19 +172,19 @@ IMAGE_DESCRIPTORS = {
 	},
 	OBJECT_TYPE_GHOST_ARCHER_ATTACK: {
 		"filename": "img/ghost_archer_attack.png",
-		"scale": 1.0,
+		"scale": 0.25,
 	},
 	OBJECT_TYPE_GHOST_ARCHER_DEAD: {
 		"filename": "img/ghost_archer_dead.png",
-		"scale": 1.0,
+		"scale": 0.25,
 	},
 	OBJECT_TYPE_GHOST_ARCHER_HURT: {
 		"filename": "img/ghost_archer_hurt.png",
-		"scale": 1.0,
+		"scale": 0.25,
 	},
     OBJECT_TYPE_GHOST_ARCHER_IDLE: {
 		"filename": "img/ghost_archer_idle.png",
-		"scale": 1.0,
+		"scale": 0.25,
 	},
 	OBJECT_TYPE_LABEL_QUIT: {
 		"filename": "img/label_quit.png",
@@ -183,23 +200,24 @@ IMAGE_DESCRIPTORS = {
 	},
     OBJECT_TYPE_LIGHTNING_BOLT: {
 		"filename": "img/lightning_bolt.png",
-		"scale": 1.0,
+		"scale": 0.25,
+        "angle": -90
 	},
 	OBJECT_TYPE_MAGE_ATTACK: {
 		"filename": "img/mage_attack.png",
-		"scale": 1.0,
+		"scale": 0.25,
 	},
 	OBJECT_TYPE_MAGE_DEAD: {
 		"filename": "img/mage_dead.png",
-		"scale": 1.0,
+		"scale": 0.25,
 	},
 	OBJECT_TYPE_MAGE_HURT: {
 		"filename": "img/mage_hurt.png",
-		"scale": 1.0,
+		"scale": 0.25,
 	},
     OBJECT_TYPE_MAGE_IDLE: {
 		"filename": "img/mage_idle.png",
-		"scale": 1.0,
+		"scale": 0.25,
 	},
 	OBJECT_TYPE_NPC_A_PORTRAIT: {
 		"filename": "img/npc_a_portrait.png",
@@ -265,7 +283,7 @@ ANIMATION_DESCRIPTORS = {
 		ANIMATION_TYPE_IDLE: {
 			"filename": "img/fire_spell/idle",
 			"image_count": 121,
-			"scale": 1.0,
+			"scale": 0.25,
             "base_frame": 1,
 		},
 	},
@@ -273,7 +291,7 @@ ANIMATION_DESCRIPTORS = {
 		ANIMATION_TYPE_IDLE: {
 			"filename": "img/ice_spell/idle",
 			"image_count": 78,
-			"scale": 1.0,
+			"scale": 0.25,
             "base_frame": 1,
 		},
 	},

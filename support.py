@@ -177,6 +177,7 @@ class AudioPlayer(Observable):
         """
 
         track = pg.mixer.Sound(filename)
+        track.set_volume(0.75)
         self._tracks[track_name] = track
 
     def unload_track(self, track_name: str) -> None:
@@ -880,6 +881,10 @@ class View:
         scale = descriptor["scale"]
         image = pg.image.load(filename).convert_alpha()
         image = pg.transform.scale_by(image, scale)
+        if "flip" in descriptor:
+            image = pg.transform.flip(image, True, False)
+        if "angle" in descriptor:
+            image = pg.transform.rotate(image, descriptor["angle"])
         self._images[object_type] = image
     
     def _unload_image(self, object_type: int) -> None:
@@ -913,11 +918,14 @@ class View:
             images = []
             base_filename = descriptor["filename"]
             image_count = descriptor["image_count"]
+            base_frame_number = descriptor["base_frame"]
             scale = descriptor["scale"]
             for i in range(image_count):
-                filename = base_filename + f"{str(i).zfill(3)}.png"
+                filename = base_filename + f"{str(i + base_frame_number).zfill(3)}.png"
                 image = pg.image.load(filename).convert_alpha()
                 image = pg.transform.scale_by(image, scale)
+                if base_frame_number == 1:
+                    image.set_colorkey((0,0,0))
                 images.append(image)
             spritesheet[animation_type] = images
     
