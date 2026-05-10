@@ -2426,7 +2426,7 @@ class ConsoleModel(Model):
                 self.cursor_pos -= 1
             elif (self.cursor_line) > 0:
                 self.cursor_line -= 1
-                self.cursor_pos = len(self.cursor_line) - 1
+                self.cursor_pos = len(self._buffer[self.cursor_line]) - 1
                 self._buffer[self.cursor_line] = \
                     self._buffer[self.cursor_line][:self.cursor_pos] 
         

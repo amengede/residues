@@ -1,2 +1,3 @@
-demon 10/10 16
-demon 8/8 13
+demon 8/8 16
+ghost_archer 23/23 17
+ghost_archer 24/24 12
