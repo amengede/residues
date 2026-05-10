@@ -991,7 +991,8 @@ class View:
     
     def _draw_entity_image(
             self, entity: Entity,
-            cam_x: int = 0, cam_y: int = 0) -> None:
+            cam_x: int = 0, cam_y: int = 0,
+            should_flip: bool = False) -> None:
         """
             Draw an entity with an image.
 
@@ -1006,6 +1007,8 @@ class View:
             return
         
         image = self._images[object_type]
+        if should_flip:
+            image = pg.transform.flip(image, True, False)
         dst_rect = entity.get_draw_rect_data()
         dst_rect[0] -= cam_x
         dst_rect[1] -= cam_y

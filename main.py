@@ -675,6 +675,7 @@ class OverworldModel(Model):
         audio_system.start_music("overworld")
         if OverworldModel.fresh:
             self.load("levels/level_1.txt")
+            self.fresh = False
         else:
             self.load("levels/temp.txt")
         
@@ -683,6 +684,7 @@ class OverworldModel(Model):
         self._speaking_npc = None
         self._timer = None
         self.add_observer(audio_system.get_events())
+        self.should_compute = False
     
     def get_dialogue_buffer(self) -> str:
         return self._dialogue_buffer
@@ -916,6 +918,9 @@ class OverworldModel(Model):
 
     def update(self) -> int:
 
+        if self.should_compute:
+            return GAME_PHASE_CONSOLE
+
         for event in self.get_events():
             if (event.event_type in (EVENT_TYPE_STEP_DIRT,
                                      EVENT_TYPE_STEP_PATH)):
@@ -999,6 +1004,13 @@ class OverworldModel(Model):
                 npc: NPC = overlapping[0]
                 self._dialogue_line = npc.speak()
                 self._speaking_npc = npc
+            
+            overlapping = self._object_groups[
+                OBJECT_TYPE_OVERWORLD_PUZZLE].get_overlapping(shifted_rect)
+            
+            if len(overlapping) > 0:
+                self.save("levels/temp.txt")
+                self.should_compute = True
 
 class OverworldView(View):
 
@@ -1035,7 +1047,8 @@ class OverworldView(View):
         for entity in visible_set:
             self._draw_entity_image(entity, cam_x, cam_y)
         
-        self._draw_entity_image(player, cam_x, cam_y)
+        should_flip = True if player.x_scale < 0 else False
+        self._draw_entity_image(player, cam_x, cam_y, should_flip)
 
         for grass in covering_grass:
             self._draw_entity_image(grass, cam_x, cam_y)
@@ -2214,11 +2227,12 @@ class ConsoleModel(Model):
         self._declare_gfx(OBJECT_TYPE_GEAR)
         self.should_exit = False
 
-        self.playhead = 0
         self.timer = None
 
         self.memory = [0 for _ in range(10)]
-        self.stack = [0 for _ in range[10]]
+        self.stack = [0 for _ in range(10)]
+        self.stack_pointer = 0
+        self.instruction_counter = 0
 
         #TODO: Make buttons
     
@@ -2243,16 +2257,26 @@ class ConsoleModel(Model):
     def get_memory(self) -> list[int]:
         return self.memory
     
+    def get_stack_pointer(self) -> int:
+        return self.stack_pointer
+    
+    def get_stack(self) -> list[int]:
+        return self.stack
+    
+    def get_instruction_counter(self) -> int:
+        return self.instruction_counter
+    
     def update(self) -> int:
 
         if self.should_exit:
             return GAME_PHASE_OVERWORLD
         
         if self.timer is not None:
+            self.timer.update()
             if self.timer.is_ellapsed():
-                self.run_line(self.playhead)
-                self.playhead += 1
-                if self.playhead < ConsoleModel.MAX_LINE_COUNT:
+                self.run_line(self.instruction_counter)
+                self.instruction_counter += 1
+                if self.instruction_counter < len(self._buffer):
                     self.timer = Timer(60)
 
         #TODO: update buttons
@@ -2261,32 +2285,83 @@ class ConsoleModel(Model):
         return GAME_PHASE_NO_CHANGE
     
     def run_line(self, line_number: int):
+
+        self.publish(Message(EVENT_TYPE_MACHINE_TICK,
+                             OBJECT_TYPE_MODEL, self))
         
-        line = self.buffer[line_number].strip()
+        line = self._buffer[line_number].strip()
         words = line.split(" ")
 
         if words[0] == "push":
-            #TODO: Push onto stack
-            pass
+            self.execute_push_op(words)
         if words[0] == "pop":
-            #TODO: Pop from stack
-            pass
+            self.execute_pop_op(words)
         if words[0] == "add":
-            #TODO: add operation
-            pass
+            self.execute_add_op()
         if words[0] == "sub":
-            #TODO: sub operation
-            pass
+            self.execute_sub_op()
         if words[0] == "mul":
-            #TODO: mul op
-            pass
+            self.execute_mul_op()
         if words[0] == "load":
-            #TODO: load op
-            pass
+            self.execute_load_op()
         if words[0] == "store":
-            #TODO: store op
-            pass
-            
+            self.execute_store_op()
+    
+    def execute_push_op(self, words: list[int]) -> None:
+        if self.stack_pointer == 10:
+            return
+        
+        self.stack[self.stack_pointer] = int(words[1])
+        self.stack_pointer += 1
+    
+    def execute_pop_op(self, words: list[int]) -> None:
+        if self.stack_pointer == 0:
+            return
+        
+        self.stack_pointer -= 1
+    
+    def execute_add_op(self) -> None:
+        if self.stack_pointer < 2:
+            return
+        
+        operand_a = self.stack[self.stack_pointer - 1]
+        operand_b = self.stack[self.stack_pointer - 2]
+        self.stack_pointer -= 1
+        self.stack[self.stack_pointer - 1] = operand_a + operand_b
+    
+    def execute_sub_op(self) -> None:
+        if self.stack_pointer < 2:
+            return
+        
+        operand_a = self.stack[self.stack_pointer - 1]
+        operand_b = self.stack[self.stack_pointer - 2]
+        self.stack_pointer -= 1
+        self.stack[self.stack_pointer - 1] = operand_a - operand_b
+    
+    def execute_mul_op(self) -> None:
+        if self.stack_pointer < 2:
+            return
+        
+        operand_a = self.stack[self.stack_pointer - 1]
+        operand_b = self.stack[self.stack_pointer - 2]
+        self.stack_pointer -= 1
+        self.stack[self.stack_pointer - 1] = operand_a * operand_b
+    
+    def execute_load_op(self) -> None:
+        if self.stack_pointer < 1:
+            return
+        
+        address = self.stack[self.stack_pointer - 1]
+        self.stack[self.stack_pointer - 1] = self.memory[address]
+    
+    def execute_store_op(self) -> None:
+        if self.stack_pointer < 2:
+            return
+        
+        value = self.stack[self.stack_pointer - 2]
+        address = self.stack[self.stack_pointer - 1]
+        self.memory[address] = value
+        self.stack_pointer -= 2
     
     def key_pressed(self, key: int) -> None:
 
@@ -2378,10 +2453,12 @@ class ConsoleView(View, Observable):
                 self.gear_angle = self.gear_angle % 360
         self._event_queue.clear()
 
-    
     def draw(self, top_line: str,
              buffer: list[str],
-             memory: list[int]) -> None:
+             memory: list[int],
+             stack: list[int],
+             stack_pointer: int,
+             instruction_counter: int) -> None:
 
         self._screen.fill((196, 196, 196))
 
@@ -2396,10 +2473,15 @@ class ConsoleView(View, Observable):
 
         self._draw_text(top_line, 200, 75, (0, 32, 0))
         for i, line in enumerate(buffer):
-            self._draw_text(line, 200, 75 + 25 * (i + 1), (0, 32, 0))
+            color = (128, 32, 0) if i == instruction_counter else (0, 32, 0)
+            self._draw_text(line, 200, 75 + 25 * (i + 1), color)
 
         for i, value in enumerate(memory):
-            self._draw_text(value, 200 + 50 * i, 600, (0, 32, 0))
+            self._draw_text(str(value), 150 + 40 * i, 475, (0, 32, 0))
+        
+        for i, value in enumerate(stack):
+            color = (128, 32, 0) if i == stack_pointer else (0, 32, 0)
+            self._draw_text(str(value), 700, 35 + 35 * i, color)
 
         object_type = OBJECT_TYPE_GEAR
         
@@ -2454,7 +2536,10 @@ class ConsoleController(Controller):
     def _draw(self) -> None:
         self._view.draw(self._model.get_top_line(),
                         self._model.get_buffer(),
-                        self._model.get_memory())
+                        self._model.get_memory(),
+                        self._model.get_stack(),
+                        self._model.get_stack_pointer(),
+                        self._model.get_instruction_counter())
     
     def _update_world(self) -> int:
         audio_system.update()
@@ -2469,7 +2554,7 @@ class ConsoleController(Controller):
         return self._model.handle_click()
 #endregion
 def main():
-    next_phase = GAME_PHASE_CONSOLE
+    next_phase = GAME_PHASE_LOGO
     while next_phase != GAME_PHASE_EXIT:
         if next_phase == GAME_PHASE_LOGO:
             controller = LogoController(clock, screen)
