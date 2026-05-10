@@ -2274,10 +2274,15 @@ class ConsoleModel(Model):
         if self.timer is not None:
             self.timer.update()
             if self.timer.is_ellapsed():
-                self.run_line(self.instruction_counter)
-                self.instruction_counter += 1
                 if self.instruction_counter < len(self._buffer):
+                    self.run_line(self.instruction_counter)
+                    self.instruction_counter += 1
                     self.timer = Timer(60)
+                else:
+                    self.timer = None
+                    self.instruction_counter = 0
+                    self.publish(Message(EVENT_TYPE_MACHINE_RESET,
+                                         OBJECT_TYPE_MODEL, self))
 
         #TODO: update buttons
         pass
@@ -2421,7 +2426,7 @@ class ConsoleModel(Model):
                 self.cursor_pos -= 1
             elif (self.cursor_line) > 0:
                 self.cursor_line -= 1
-                self.cursor_pos = len(self.cursor_line - 1)
+                self.cursor_pos = len(self.cursor_line) - 1
                 self._buffer[self.cursor_line] = \
                     self._buffer[self.cursor_line][:self.cursor_pos] 
         
