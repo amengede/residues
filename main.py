@@ -675,7 +675,7 @@ class OverworldModel(Model):
         audio_system.start_music("overworld")
         if OverworldModel.fresh:
             self.load("levels/level_1.txt")
-            self.fresh = False
+            OverworldModel.fresh = False
         else:
             self.load("levels/temp.txt")
         
