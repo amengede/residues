@@ -1750,6 +1750,8 @@ class BattleModel(Model):
         pass
 
     def enter_target_damaged(self) -> None:
+        if self.current_target == None:
+            return
         damage = self.current_actor.get_damage() + random.randint(1, 5)
         self.current_target.take_damage(damage)
         if self.current_move == "Ice Spell":
